@@ -3,17 +3,14 @@ package com.wangxiaoer.es.config;
 
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 /**
  * 数据配置
@@ -25,79 +22,40 @@ import java.net.InetAddress;
 
 
 @Configuration
-public class ESConfiguration implements FactoryBean<TransportClient>, InitializingBean, DisposableBean {
-
-    private static final Logger logger = LoggerFactory.getLogger(ESConfiguration.class);
-
-
-    /**
-     * es集群地址
-     */
-    @Value("127.0.0.1")
-    private String hostName;
-    /**
-     * 端口
-     */
-    @Value("${elasticsearch.port}")
-    private String port;
-    /**
-     * 集群名称
-     */
-    @Value("${elasticsearch.cluster.name}")
+public class ESConfiguration {
+    @Value("elasticsearch") //
     private String clusterName;
 
-    /**
-     * 连接池
-     */
-    @Value("${elasticsearch.pool}")
+    @Value("localhost")//202.196.37.169
+    private String hostName;
+
+    @Value("9300")
+    private String port;
+
+    @Value("5")
     private String poolSize;
 
-    private TransportClient client;
+    @Value("5")
+    private  String pingTimeout;
 
+    @Value("5")
+    private  String nodesSamplerInterval;
 
-    @Override
-    public void destroy() throws Exception {
-        try {
-            logger.info("Closing elasticSearch client");
-            if (client != null) {
-                client.close();
-            }
-        } catch (final Exception e) {
-            logger.error("Error closing ElasticSearch client: ", e);
-        }
+    @Bean
+    public TransportClient client() throws UnknownHostException {
+        Settings settings = Settings.builder()
+                .put("cluster.name", clusterName)
+//                .put("thread_pool.search.size", Integer.parseInt(poolSize))
+//                .put("client.transport.sniff", true)
+//                .put("client.transport.ignore_cluster_name",true)    //设置为true忽略已连接节点的群集名称验证。
+//                .put("client.transport.ping_timeout",Integer.parseInt(pingTimeout))               //等待节点ping响应的时间。默认为5s。
+//                .put("client.transport.nodes_sampler_interval",Integer.parseInt(nodesSamplerInterval))   //对列出和连接的节点进行采样/ ping的频率。默认为5s。
+                .build();
 
-    }
+        TransportClient client = new PreBuiltTransportClient(settings)
+                .addTransportAddress(new TransportAddress(InetAddress.getByName(hostName), Integer.parseInt(port)));
 
-    @Override
-    public TransportClient getObject() throws Exception {
-        return client;
-    }
-
-    @Override
-    public Class<TransportClient> getObjectType() {
-        return TransportClient.class;
-    }
-
-    @Override
-    public boolean isSingleton() {
-        return false;
-    }
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        try {
-            // 配置信息
-            Settings esSetting = Settings.builder().put("cluster.name", clusterName).put("client.transport.sniff", true)// 增加嗅探机制，找到ES集群
-                    .put("thread_pool.search.size", Integer.parseInt(poolSize))// 增加线程池个数，暂时设为5
-                    .build();
-
-            client = new PreBuiltTransportClient(esSetting);
-            InetSocketTransportAddress inetSocketTransportAddress = new InetSocketTransportAddress(InetAddress.getByName(hostName), Integer.valueOf(port));
-            client.addTransportAddresses(inetSocketTransportAddress);
-
-        } catch (Exception e) {
-            logger.error("elasticsearch TransportClient create error!!!", e);
-        }
+        return  client;
 
     }
 }
